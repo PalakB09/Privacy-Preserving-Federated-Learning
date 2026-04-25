@@ -1,0 +1,110 @@
+def run_step(step_idx):
+    """Execute one step of the simulation pipeline."""
+    sd = st.session_state.sim_data
+    clients = sd["clients"]
+    cfg = sd["cfg"]
+    nc = cfg["num_clients"]
+
+    if step_idx == 0:  # Client Training
+        for c in clients:
+            add_log(f"[CLIENT {c.client_id}] Local training ({cfg['local_epochs']} epochs)...")
+            c.train(st.session_state.global_params)
+            acc = c.get_local_accuracy()
+            loss = c.get_local_loss()
+            st.session_state.round_losses.append(loss)
+            st.session_state.client_progress[c.client_id] = 100
+            st.session_state.client_statuses[c.client_id] = f"{acc:.2%}"
+            add_log(f"[CLIENT {c.client_id}] Training complete - acc: {acc:.4f}")
+
+    elif step_idx == 1:  # Encryption
+        st.session_state.enc_updates = []
+        st.session_state.enc_previews = []
+        for c in clients:
+            enc = c.encrypt_update(sd["server_pub"])
+            st.session_state.enc_updates.append(enc)
+            preview = enc["ciphertext"][:20] + "..."
+            st.session_state.enc_previews.append((c.client_id, preview))
+            add_log(f"[CLIENT {c.client_id}] Update encrypted")
+
+    elif step_idx == 2:  # Ring Signature
+        st.session_state.signatures = []
+        for c in clients:
+            enc = st.session_state.enc_updates[c.client_id]
+            sig = c.sign_update(enc, sd["all_pubs"])
+            st.session_state.signatures.append(sig)
+            st.session_state.sig_statuses[c.client_id] = "signed"
+            add_log(f"[CLIENT {c.client_id}] Signed anonymously")
+
+    elif step_idx == 3:  # Send to Server
+        add_log(f"[NETWORK] {nc} encrypted+signed packets sent to server")
+        for cid in range(nc):
+            add_log(f"[NETWORK] Client {cid} -> Server  [OK]")
+
+    elif step_idx == 4:  # Verify Signatures
+        lsag = sd["lsag"]
+        st.session_state.verify_results = []
+        for cid in range(nc):
+            enc = st.session_state.enc_updates[cid]
+            sig = st.session_state.signatures[cid]
+            msg = json.dumps(enc, sort_keys=True).encode()
+            valid = lsag.verify(sig, msg)
+            st.session_state.verify_results.append((cid, valid))
+            add_log(f"[SERVER] Update {cid}: signature {'valid' if valid else 'INVALID'}")
+
+    elif step_idx == 5:  # Threshold Decryption
+        td = sd["threshold_dec"]
+        pi = sd["party_indices"]
+        add_log(f"[THRESHOLD] Parties {pi} contributing partial decryptions")
+        decrypted = []
+        for cid in range(nc):
+            enc = st.session_state.enc_updates[cid]
+            partials = [td.get_partial_decryption(enc, pidx) for pidx in pi]
+            weights = td.combine_and_decrypt(enc, partials)
+            decrypted.append(weights)
+        st.session_state._decrypted_updates = decrypted
+        st.session_state.threshold_status = "Reconstruction successful"
+        add_log(f"[THRESHOLD] Reconstruction successful")
+
+    elif step_idx == 6:  # Aggregation
+        decrypted = st.session_state._decrypted_updates
+        agg = np.mean(decrypted, axis=0)
+        st.session_state.global_params = agg
+        st.session_state.agg_done = True
+        add_log(f"[SERVER] Aggregation complete - {len(decrypted)} updates averaged")
+
+    elif step_idx == 7:  # Update Global Model
+        gm = FederatedLogisticRegression(
+            learning_rate=cfg["learning_rate"], max_iter=cfg["local_epochs"]
+        )
+        gm.set_parameters(st.session_state.global_params)
+        y_pred = gm.predict(sd["X_test"])
+        y_proba = gm.predict_proba(sd["X_test"])[:, 1]
+        acc = accuracy_score(sd["y_test"], y_pred)
+        auc = roc_auc_score(sd["y_test"], y_proba)
+        avg_loss = float(np.mean(st.session_state.round_losses))
+
+        st.session_state.accuracy_history.append(acc)
+        st.session_state.loss_history.append(avg_loss)
+        st.session_state.auc_history.append(auc)
+
+        rnd = st.session_state.current_round
+        add_log(f"[ROUND {rnd}] Accuracy: {acc:.4f} | AUC: {auc:.4f} | Loss: {avg_loss:.4f}")
+
+        if rnd < cfg["rounds"]:
+            st.session_state.current_round += 1
+            st.session_state.current_step = 0
+            reset_round_state()
+            add_log(f"[ROUND {rnd + 1}] Starting round {rnd + 1}")
+        else:
+            st.session_state.sim_complete = True
+            add_log(f"[SYSTEM] Simulation complete!")
+
+
+def advance_step():
+    step = st.session_state.current_step
+    if step < 0 or st.session_state.sim_complete:
+        return
+    run_step(step)
+    if step < 7 and not st.session_state.sim_complete:
+        st.session_state.current_step = step + 1
+

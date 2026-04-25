@@ -1,0 +1,8 @@
+numpy
+pycryptodome
+ecdsa
+pandas
+scikit-learn
+matplotlib
+streamlit
+pyyaml
