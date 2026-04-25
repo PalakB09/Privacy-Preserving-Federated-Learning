@@ -1,132 +1,124 @@
-# 🔐 Privacy-Preserving Federated Learning with Threshold Cryptography
+# Privacy-Preserving Federated Learning
 
-A production-grade research prototype implementing **privacy-preserving federated learning** that combines **threshold cryptography**, **ECIES encryption**, and **LSAG ring signatures** to ensure data confidentiality, anonymous authentication, and secure model aggregation.
-
----
-
-## 📋 Problem Statement
-
-Federated learning enables collaborative model training without sharing raw data. However, standard FL remains vulnerable to:
-
-- **Model update inference attacks** — an honest-but-curious server can extract information from plaintext gradients
-- **Identity tracking** — the server can correlate updates to specific clients across rounds
-- **Single point of failure** — if the server's decryption key is compromised, all updates are exposed
-
-This project addresses all three threats simultaneously through a layered cryptographic architecture.
+> A production-grade research prototype implementing **privacy-preserving federated learning** by combining **threshold cryptography**, **ECIES encryption**, and **LSAG ring signatures** to ensure data confidentiality, anonymous authentication, and secure model aggregation.
 
 ---
 
-## 🏗️ Architecture
+## Problem Statement
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     FEDERATED LEARNING LAYER                     │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐                      │
-│  │ Client 0 │  │ Client 1 │  │ Client 2 │   Local Training      │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘                      │
-│       │              │              │                            │
-│       ▼              ▼              ▼                            │
-│  ┌─────────────────────────────────────────┐                    │
-│  │          ECIES ENCRYPTION               │                    │
-│  │  secp256k1 ECDH + AES-GCM + PBKDF2     │                    │
-│  └─────────────────────────────────────────┘                    │
-│       │              │              │                            │
-│       ▼              ▼              ▼                            │
-│  ┌─────────────────────────────────────────┐                    │
-│  │      LSAG RING SIGNATURES              │                    │
-│  │  Anonymous authentication + linkability  │                    │
-│  └─────────────────────────────────────────┘                    │
-│       │              │              │                            │
-│       ▼              ▼              ▼                            │
-│  ┌─────────────────────────────────────────┐                    │
-│  │       COORDINATOR (SERVER)              │                    │
-│  │  Signature verify → Threshold decrypt   │                    │
-│  │  → Federated averaging                  │                    │
-│  └─────────────────┬───────────────────────┘                    │
-│                    │                                             │
-│       ┌────────────┼────────────┐                               │
-│       ▼            ▼            ▼                               │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐                           │
-│  │ Party 0 │ │ Party 2 │ │ Party 4 │  Threshold Decryption     │
-│  │ (share) │ │ (share) │ │ (share) │  (t-of-n parties)         │
-│  └─────────┘ └─────────┘ └─────────┘                           │
-└─────────────────────────────────────────────────────────────────┘
+Federated learning enables collaborative model training without sharing raw data. However, standard FL architectures remain vulnerable to three critical attack vectors:
+
+1. **Model Update Inference Attacks**: An honest-but-curious server can extract sensitive information from plaintext gradients.
+2. **Identity Tracking**: The server can correlate updates to specific clients across rounds, breaking anonymity.
+3. **Single Point of Failure**: If the server's decryption key is compromised, all historical and future updates are exposed.
+
+This project addresses all three threats simultaneously through a multi-layered cryptographic architecture.
+
+---
+
+## System Architecture
+
+```mermaid
+graph TD
+    subgraph FL_Clients["Federated Learning Edge Devices"]
+        C0["Client 0 (Local Training)"]
+        C1["Client 1 (Local Training)"]
+        C2["Client 2 (Local Training)"]
+    end
+
+    subgraph Crypto_Layer["Client Cryptographic Layer"]
+        ECIES["ECIES Encryption (secp256k1 + AES-GCM + PBKDF2)"]
+        LSAG["LSAG Ring Signatures (Anonymous Auth)"]
+    end
+
+    subgraph Coordinator["Server / Aggregator"]
+        Verify["Signature Verification (Replay Prevention)"]
+        FedAvg["Federated Averaging (Global Model Update)"]
+    end
+
+    subgraph Threshold_Network["Decryption Network (t-of-n)"]
+        P0["Party 0 (Key Share)"]
+        P1["Party 1 (Key Share)"]
+        Pn["Party N (Key Share)"]
+    end
+
+    C0 & C1 & C2 -->|"1. Extract Weights"| ECIES
+    ECIES -->|"2. Encrypt Payload"| LSAG
+    LSAG -->|"3. Transmit Signed Packet"| Verify
+    Verify -->|"4. Route to Network"| P0 & P1 & Pn
+    P0 & P1 & Pn -->|"5. Partial Decryptions"| FedAvg
+    FedAvg -.->|"6. Broadcast Global Model"| C0 & C1 & C2
+
+    classDef client fill:#1e40af,stroke:#1d4ed8,color:#ffffff,font-weight:bold,rx:8px,ry:8px;
+    classDef crypto fill:#047857,stroke:#059669,color:#ffffff,font-weight:bold,rx:8px,ry:8px;
+    classDef server fill:#6b21a8,stroke:#7e22ce,color:#ffffff,font-weight:bold,rx:8px,ry:8px;
+    classDef party fill:#b45309,stroke:#d97706,color:#ffffff,font-weight:bold,rx:8px,ry:8px;
+
+    class C0,C1,C2 client;
+    class ECIES,LSAG crypto;
+    class Verify,FedAvg server;
+    class P0,P1,Pn party;
 ```
 
 ---
 
-## 📁 Project Structure
+## Security Properties
 
-```
+Our architecture guarantees the following security properties by design:
+
+| Security Property | Mechanism |
+|-------------------|-----------|
+| **Data Confidentiality** | ECIES hybrid encryption (`secp256k1` ECDH + AES-256-GCM) secures the model payload. |
+| **Key Derivation** | PBKDF2 with a random salt (100,000 iterations) defends against dictionary attacks. |
+| **Distributed Trust** | Dealerless threshold key generation ensures no single party or trusted dealer holds the master private key. |
+| **Anonymous Authentication** | LSAG (Linkable Spontaneous Anonymous Group) signatures conceal the signer's true identity within a group. |
+| **Replay Prevention** | Cryptographic key images detect and prevent double-signing and replay attacks. |
+| **Timing Safety** | Constant-time signature comparison using `secrets.compare_digest` mitigates side-channel timing attacks. |
+
+---
+
+## Project Structure
+
+```text
 threshold-fl/
-│
-├── crypto/                    # Cryptographic primitives
+├── crypto/                    # Core Cryptographic Primitives
 │   ├── secp256k1.py           # Elliptic curve point operations
-│   ├── threshold.py           # Dealerless DKG + threshold decryption
-│   ├── encryption.py          # ECIES encrypt/decrypt (AES-GCM + PBKDF2)
-│   └── lsag.py                # LSAG ring signature (sign + verify)
-│
-├── federated/                 # Federated learning components
-│   ├── model.py               # Logistic regression (from scratch)
+│   ├── threshold.py           # Dealerless DKG & threshold decryption
+│   ├── encryption.py          # ECIES hybrid encryption (AES-GCM + PBKDF2)
+│   └── lsag.py                # LSAG ring signature generation & verification
+├── federated/                 # Federated Learning Implementation
+│   ├── model.py               # Logistic regression model
 │   ├── client.py              # FL client: train, encrypt, sign
 │   └── coordinator.py         # Server: verify, decrypt, aggregate
-│
-├── data/
-│   └── dataset_loader.py      # Dataset loading + client partitioning
-│
-├── scripts/
-│   ├── run_simulation.py      # Main simulation orchestration
-│   └── visualize.py           # Matplotlib plotting utilities
-│
-├── demo/
-│   └── app.py                 # Streamlit interactive dashboard
-│
-├── config/
-│   └── config.yaml            # Simulation parameters
-│
-├── utils/
-│   └── logger.py              # Timestamped color-coded logger
-│
-├── outputs/                   # Generated plots (auto-created)
-├── requirements.txt
-└── README.md
+├── data/                      # Dataset Management
+│   └── dataset_loader.py      # Data loading and client partitioning
+├── demo/                      # Interactive UI Dashboard
+│   ├── app.py                 # Streamlit entry point
+│   ├── renderers.py           # UI component renderers
+│   └── styles.py              # CSS styling
+├── scripts/                   # CLI Tools
+│   └── run_simulation.py      # Headless simulation orchestration
+└── config/
+    └── config.yaml            # Global simulation parameters
 ```
 
 ---
 
-## 🔧 Module Breakdown
+## Quick Start
 
-### Crypto Layer
+### 1. Environment Setup
 
-| Module | Description |
-|--------|-------------|
-| `secp256k1.py` | Custom secp256k1 curve implementation: point addition, scalar multiplication, hash-to-point, key generation |
-| `threshold.py` | Dealerless distributed key generation (Pedersen-style) with Shamir sharing and Lagrange interpolation in the exponent |
-| `encryption.py` | ECIES-style hybrid encryption: ephemeral ECDH → PBKDF2 → AES-256-GCM |
-| `lsag.py` | Linkable Spontaneous Anonymous Group signatures with constant-time verification |
-
-### Federated Layer
-
-| Module | Description |
-|--------|-------------|
-| `model.py` | Binary logistic regression with L2 regularization, gradient descent, and loss tracking |
-| `client.py` | Encapsulates local training, weight encryption, and anonymous signing per participant |
-| `coordinator.py` | Server-side: signature verification, replay prevention, threshold decryption, federated averaging |
-
----
-
-## 🚀 How to Run
-
-### 1. Setup Virtual Environment
+Create and activate a Python virtual environment:
 
 ```bash
+# Clone and enter directory
 cd threshold-fl
 python -m venv venv
 
 # Windows
 venv\Scripts\activate
 
-# macOS/Linux
+# macOS / Linux
 source venv/bin/activate
 ```
 
@@ -136,108 +128,42 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Place Dataset
+### 3. Launch the Interactive Dashboard
 
-Ensure `filtered_diabetes_data (2).csv` is in the `threshold-fl/` directory (or update the path in `config/config.yaml`).
-
-### 4. Run Simulation (CLI)
-
-```bash
-python scripts/run_simulation.py
-```
-
-### 5. Launch Streamlit Demo
+Experience the full simulation, step-by-step cryptographic processes, and live mathematical execution via the Streamlit dashboard:
 
 ```bash
 streamlit run demo/app.py
 ```
 
+### 4. Run Headless Simulation (CLI)
+
+Alternatively, run the simulation in the terminal:
+
+```bash
+python scripts/run_simulation.py
+```
+
 ---
 
-## ⚙️ Configuration
+## Configuration
 
-Edit `config/config.yaml`:
+Control the simulation parameters by editing `config/config.yaml`:
 
 ```yaml
-num_clients: 3        # Number of federated learning clients
-num_parties: 5        # Number of threshold decryption parties
-threshold: 3          # Minimum parties needed to decrypt (t-of-n)
-rounds: 2             # Number of federated training rounds
+num_clients: 3        # Total federated learning clients
+num_parties: 5        # Total threshold decryption parties (n)
+threshold: 3          # Minimum parties required to decrypt (t)
+rounds: 2             # Total federated training rounds
 learning_rate: 0.1    # Gradient descent learning rate
 local_epochs: 10      # Training epochs per client per round
-random_seed: 42       # For reproducibility
-test_size: 0.2        # Train/test split ratio
+random_seed: 42       # Random seed for reproducibility
+test_size: 0.2        # Train/test partition ratio
 dataset_path: "filtered_diabetes_data (2).csv"
 ```
 
 ---
 
-## 📊 Sample Output
+## License
 
-```
-======================================================================
-  PRIVACY-PRESERVING FEDERATED LEARNING WITH THRESHOLD CRYPTOGRAPHY
-======================================================================
-
-[11:23:45] [Main] Running dealerless distributed key generation...
-[11:23:45] [Main] Dealerless key generation complete (no party knows full private key)
-[11:23:45] [Main] Parties [0, 1, 2, 3, 4] hold shares
-[11:23:45] [Main] Any 3 parties can collaborate to decrypt
-
-[11:23:46] [Main] 3 client secp256k1 keypairs generated
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  ROUND 1/2
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[11:23:46] [Main] [Client 0] Local training (10 epochs)...
-[11:23:46] [Main] [Client 0] Training complete — accuracy: 0.8542, loss: 0.4523
-[11:23:47] [Main] [Client 0] Update encrypted
-[11:23:48] [Main] [Client 0] Signed anonymously (LSAG ring signature)
-
-[11:23:49] [Server] Anonymous update 0: signature valid ✓
-[11:23:49] [Threshold] Parties [0, 2, 4] contributing to threshold decryption
-[11:23:50] [Threshold] Reconstruction successful ✓
-
-[11:23:50] [Server] Aggregation complete — 3 valid updates averaged
-[11:23:50] [Main] [Round 1] Global Accuracy: 0.8400 | AUC: 0.8912
-
-======================================================================
-  SECURITY SUMMARY
-======================================================================
-  ✅ ECIES encryption (secp256k1 + AES-GCM + PBKDF2)
-  ✅ Anonymous authentication via LSAG ring signatures
-  ✅ Dealerless threshold decryption (3/5 parties)
-  ✅ Replay attack prevention
-  ✅ Constant-time signature verification
-  🎯 Final Accuracy: 0.8456
-  🎯 Final AUC: 0.9023
-```
-
----
-
-## 🛡️ Security Properties
-
-| Property | Mechanism |
-|----------|-----------|
-| **Data Confidentiality** | ECIES hybrid encryption (secp256k1 ECDH + AES-GCM) |
-| **Key Derivation** | PBKDF2 with random salt (100,000 iterations) |
-| **Distributed Trust** | Dealerless threshold key generation — no trusted dealer |
-| **Anonymous Auth** | LSAG ring signatures hide signer identity |
-| **Linkability** | Key images detect double-signing / replay attacks |
-| **Timing Safety** | Constant-time signature comparison via `secrets.compare_digest` |
-
----
-
-## 📚 Academic References
-
-1. Pedersen, T.P. "A Threshold Cryptosystem without a Trusted Party." *EUROCRYPT 1991*.
-2. Liu, J.K., Wei, V.K., Wong, D.S. "Linkable Spontaneous Anonymous Group Signature for Ad Hoc Groups." *ACISP 2004*.
-3. McMahan, H.B., et al. "Communication-Efficient Learning of Deep Networks from Decentralized Data." *AISTATS 2017*.
-4. Bonawitz, K., et al. "Practical Secure Aggregation for Privacy-Preserving Machine Learning." *CCS 2017*.
-
----
-
-## 📄 License
-
-Research prototype — for academic use.
+This repository is provided as a research prototype for academic and educational purposes.
