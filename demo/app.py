@@ -27,7 +27,7 @@ from demo.renderers import (
     render_stepper, render_step_info, render_clients_training,
     render_encrypted_updates, render_ring_signatures, render_threshold_parties,
     render_aggregation, render_server_verification, render_round_progress,
-    render_metric_card, render_math_panel, STEPS,
+    render_metrics_grid, render_bottom_status, render_math_panel, STEPS,
 )
 
 st.set_page_config(page_title="Threshold-FL Demo", page_icon="", layout="wide", initial_sidebar_state="expanded")
@@ -261,21 +261,22 @@ def reset_simulation():
 
 def make_chart(data, color, marker, ylabel, title):
     fig, ax = plt.subplots(figsize=(6, 3))
-    fig.patch.set_facecolor("#0e1117")
-    ax.set_facecolor("#0e1117")
+    fig.patch.set_facecolor("white")
+    ax.set_facecolor("white")
     rounds = list(range(1, len(data) + 1))
     ax.plot(rounds, data, marker=marker, linewidth=2.5, markersize=7,
             color=color, markerfacecolor=color)
-    ax.set_xlabel("Round", color="white", fontsize=10)
-    ax.set_ylabel(ylabel, color="white", fontsize=10)
-    ax.set_title(title, color="white", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Round", color="#64748b", fontsize=10)
+    ax.set_ylabel(ylabel, color="#64748b", fontsize=10)
+    if title:
+        ax.set_title(title, color="#0f172a", fontsize=11, fontweight="bold")
     if data:
         max_r = max(len(data), 2)
         ax.set_xticks(range(1, max_r + 1))
-    ax.tick_params(colors="white", labelsize=8)
-    ax.grid(True, alpha=0.15, color="white")
+    ax.tick_params(colors="#64748b", labelsize=8)
+    ax.grid(True, alpha=0.15, color="#64748b")
     for spine in ax.spines.values():
-        spine.set_color("#21262d")
+        spine.set_color("#e5e7eb")
     fig.tight_layout()
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", facecolor=fig.get_facecolor(), edgecolor='none')
@@ -289,18 +290,20 @@ def make_chart(data, color, marker, ylabel, title):
 # ═══════════════════════════════════════════════
 
 def main():
-    # Header
+    # ── Top Header ──
     st.markdown(
-        '<div class="main-header">'
-        '<h1>Privacy-Preserving Federated Learning</h1>'
+        '<div class="top-header">'
+        '<div class="header-title-container">'
+        '<h1><span style="color:var(--color-warning); font-size:1.8rem;">&#x1F512;</span> Privacy-Preserving Federated Learning</h1>'
         '<p>Threshold Cryptography &middot; LSAG Ring Signatures &middot; Secure Aggregation</p>'
-        '</div>', unsafe_allow_html=True,
+        '</div>'
+        '</div>', unsafe_allow_html=True
     )
 
     # ── Sidebar ──
     with st.sidebar:
-        st.markdown("### Simulation Parameters")
-        st.session_state.p_clients = st.slider("Number of Clients", 2, 10, 3, key="sl_c")
+        st.markdown('<div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem;"><span style="color:var(--color-primary); font-size:1.5rem;">&#x2699;</span> <span style="font-weight:600;">Simulation Parameters</span></div>', unsafe_allow_html=True)
+        st.session_state.p_clients = st.slider("Number of Clients", 2, 10, 5, key="sl_c")
         st.session_state.p_parties = st.slider("Number of Threshold Parties", 3, 10, 5, key="sl_p")
         max_t = st.session_state.p_parties
         st.session_state.p_threshold = st.slider("Threshold (t)", 2, max_t, min(3, max_t), key="sl_t")
@@ -368,73 +371,41 @@ def main():
     if not st.session_state.sim_complete:
         render_step_info(step)
 
-    # ── Visualization Grid ──
-    viz_col1, viz_col2, viz_col3, viz_col4 = st.columns([2, 2, 2, 2])
-
+    # ── Pipeline Visualization (Unified Row) ──
     is_auto = st.session_state.auto_running
     active_c = st.session_state.current_client if is_auto else -1
 
-    with viz_col1:
-        st.markdown(
-            render_clients_training(
-                cfg["num_clients"],
-                st.session_state.client_progress,
-                st.session_state.client_statuses,
-                active_client=active_c if step == 0 else -1
-            ), unsafe_allow_html=True,
-        )
-
-    with viz_col2:
-        st.markdown(
-            render_encrypted_updates(
-                cfg["num_clients"],
-                st.session_state.enc_previews,
-                active_client=active_c if step == 1 else -1
-            ), unsafe_allow_html=True,
-        )
-
-    with viz_col3:
-        st.markdown(
-            render_ring_signatures(
-                cfg["num_clients"], 
-                st.session_state.sig_statuses,
-                active_client=active_c if step == 2 else -1
-            ), unsafe_allow_html=True,
-        )
-
-    with viz_col4:
-        st.markdown(
-            render_threshold_parties(
-                cfg["num_parties"], cfg["threshold"],
-                st.session_state.sim_data["party_indices"] if "sim_data" in st.session_state else [],
-                st.session_state.threshold_status,
-                active_client=active_c if step == 5 else -1
-            ), unsafe_allow_html=True,
-        )
-
-    # ── Server + Aggregation row ──
-    srv_col, agg_col = st.columns([1, 1])
-    with srv_col:
-        st.markdown(
-            render_server_verification(
-                cfg["num_clients"],
-                st.session_state.verify_results,
-                active_client=active_c if step == 4 else -1
-            ), unsafe_allow_html=True,
-        )
-    with agg_col:
-        st.markdown(render_aggregation(st.session_state.agg_done), unsafe_allow_html=True)
+    pipeline_html = f"""
+    <div class="pipeline-container">
+        {render_clients_training(cfg["num_clients"], st.session_state.client_progress, st.session_state.client_statuses, active_c if step == 0 else -1)}
+        <div class="flow-arrow">&#x279C;</div>
+        {render_encrypted_updates(cfg["num_clients"], st.session_state.enc_previews, active_c if step == 1 else -1)}
+        <div class="flow-arrow">&#x279C;</div>
+        {render_ring_signatures(cfg["num_clients"], st.session_state.sig_statuses, active_c if step == 2 else -1)}
+        <div class="flow-arrow">&#x279C;</div>
+        {render_server_verification(cfg["num_clients"], st.session_state.verify_results, active_c if step == 4 else -1)}
+        <div class="flow-arrow">&#x279C;</div>
+        {render_threshold_parties(cfg["num_parties"], cfg["threshold"], st.session_state.sim_data.get("party_indices", []) if "sim_data" in st.session_state else [], st.session_state.threshold_status, active_c if step == 5 else -1)}
+        <div class="flow-arrow">&#x279C;</div>
+        {render_aggregation(st.session_state.agg_done)}
+    </div>
+    """
+    st.markdown(pipeline_html, unsafe_allow_html=True)
 
     # ── Progress + Round Info ──
-    p_col1, p_col2 = st.columns([3, 1])
+    p_col1, p_col2, p_col3 = st.columns([2, 1, 1])
     with p_col1:
-        st.markdown("**Round Progress**")
-        st.markdown(render_round_progress(rnd, total_rounds), unsafe_allow_html=True)
+        if not st.session_state.sim_complete:
+            render_step_info(step)
     with p_col2:
-        st.markdown(f"**Current Round:** {rnd} / {total_rounds}")
+        completed_clients = sum(1 for p in st.session_state.client_progress.values() if p >= 100)
+        pct = (completed_clients / cfg["num_clients"]) * 100 if cfg["num_clients"] > 0 else 0
+        st.markdown(f'<div style="font-size:0.85rem; font-weight:600; margin-bottom:0.5rem; color:var(--text-primary);">Progress</div><div style="width:100%; height:4px; background:#e2e8f0; border-radius:2px; margin-bottom:0.5rem;"><div style="width:{pct}%; height:100%; background:var(--color-primary); border-radius:2px;"></div></div><div style="font-size:0.75rem; color:var(--text-secondary);">{completed_clients} / {cfg["num_clients"]} clients trained</div>', unsafe_allow_html=True)
+    with p_col3:
+        st.markdown(f'<div class="dashboard-card" style="text-align:center; padding:0.5rem;"><div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem;">Current Round</div><div style="font-size:1.5rem; font-weight:700;">{rnd} / {total_rounds}</div></div>', unsafe_allow_html=True)
 
-    st.markdown("---")
-
+    st.markdown("<br/>", unsafe_allow_html=True)
+    
     # ── Math Panel ──
     if st.session_state.get("round_precomputed", False):
         pc = st.session_state.sim_data.get("precomputed") if "sim_data" in st.session_state else None
@@ -461,43 +432,52 @@ def main():
             unsafe_allow_html=True,
         )
 
-    st.markdown("---")
+    # ── Center Grid ──
+    g_col1, g_col2, g_col3 = st.columns([1, 1.5, 1])
 
-    # ── Bottom: Log + Metrics + Chart ──
-    bottom_col1, bottom_col2, bottom_col3 = st.columns([2, 1.5, 2.5])
+    with g_col1:
+        st.markdown('<div class="dashboard-card"><div class="dashboard-card-title">Live Simulation Log</div>', unsafe_allow_html=True)
+        log_html = []
+        for msg in reversed(st.session_state.logs):
+            msg = msg.replace("[SYSTEM]", '<span class="log-system">[SYSTEM]</span>')
+            msg = msg.replace("[CLIENT", '<span class="log-client">[CLIENT')
+            msg = msg.replace("]", ']</span>', 1) if "CLIENT" in msg else msg
+            msg = msg.replace("[ROUND", '<span class="log-round">[ROUND')
+            msg = msg.replace("]", ']</span>', 1) if "ROUND" in msg else msg
+            log_html.append(msg)
+        
+        log_text = "<br>".join(log_html)
+        st.markdown(f'<div class="log-terminal">{log_text if log_text else "Waiting..."}</div></div>', unsafe_allow_html=True)
 
-    with bottom_col1:
-        st.markdown("#### Live Simulation Log")
-        log_text = "\n".join(reversed(st.session_state.logs))
-        st.markdown(f'<div style="max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; background: #0d1117; color: #c9d1d9; padding: 10px; border-radius: 5px; border: 1px solid #30363d;">{log_text if log_text else "Waiting..."}</div>', unsafe_allow_html=True)
-
-    with bottom_col2:
-        st.markdown("#### Performance Metrics")
+    with g_col2:
+        st.markdown('<div class="dashboard-card"><div class="dashboard-card-title">Performance Metrics</div>', unsafe_allow_html=True)
         if st.session_state.accuracy_history:
             latest_acc = st.session_state.accuracy_history[-1]
             latest_auc = st.session_state.auc_history[-1]
             latest_loss = st.session_state.loss_history[-1]
-            delta_acc = ""
+            acc_d = auc_d = loss_d = 0.0
             if len(st.session_state.accuracy_history) > 1:
-                d = latest_acc - st.session_state.accuracy_history[-2]
-                delta_acc = f"+{d:.4f}" if d >= 0 else f"{d:.4f}"
-            st.markdown(render_metric_card("Accuracy", f"{latest_acc:.4f}", delta_acc), unsafe_allow_html=True)
-            st.markdown(render_metric_card("AUC Score", f"{latest_auc:.4f}"), unsafe_allow_html=True)
-            st.markdown(render_metric_card("Loss", f"{latest_loss:.4f}"), unsafe_allow_html=True)
+                acc_d = (latest_acc - st.session_state.accuracy_history[-2]) * 100
+                auc_d = (latest_auc - st.session_state.auc_history[-2]) * 100
+                loss_d = (latest_loss - st.session_state.loss_history[-2]) * 100
+            st.markdown(render_metrics_grid(latest_acc, latest_auc, latest_loss, acc_d, auc_d, loss_d), unsafe_allow_html=True)
+            
+            st.markdown('<div style="font-size:0.85rem; font-weight:600; margin:1rem 0 0.5rem 0;">Round Progress</div>', unsafe_allow_html=True)
+            st.markdown(render_round_progress(rnd, total_rounds), unsafe_allow_html=True)
         else:
-            st.markdown(render_metric_card("Accuracy", "-"), unsafe_allow_html=True)
-            st.markdown(render_metric_card("AUC Score", "-"), unsafe_allow_html=True)
-            st.markdown(render_metric_card("Loss", "-"), unsafe_allow_html=True)
+            st.markdown('<div style="text-align:center; padding:2rem; color:var(--text-muted); font-size:0.85rem;">Metrics will appear after first round completes</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    with bottom_col3:
-        st.markdown("#### Accuracy Over Rounds")
+    with g_col3:
+        st.markdown('<div class="dashboard-card"><div class="dashboard-card-title">Accuracy Over Rounds</div>', unsafe_allow_html=True)
         if st.session_state.accuracy_history:
-            img_buf = make_chart(st.session_state.accuracy_history, "#00b4d8", "o", "Accuracy", "")
+            img_buf = make_chart(st.session_state.accuracy_history, "#2563eb", "o", "Accuracy", "")
             st.image(img_buf, use_container_width=True)
         else:
-            st.markdown('<div class="viz-panel" style="text-align:center;color:#484f58;padding:2rem;">Chart will appear after first round completes</div>', unsafe_allow_html=True)
+            st.markdown('<div style="text-align:center; padding:2rem; color:var(--text-muted); font-size:0.85rem;">Chart will appear after first round completes</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Status Bar ──
+    # ── Bottom Status Bar ──
     nc = cfg["num_clients"]
     np_ = cfg["num_parties"]
     t = cfg["threshold"]
@@ -506,19 +486,7 @@ def main():
     thr_ok = bool(st.session_state.threshold_status)
     agg_ok = st.session_state.agg_done
 
-    def dot(ok):
-        return '<span class="status-dot dot-green"></span>' if ok else '<span class="status-dot dot-yellow"></span>'
-
-    status_html = (
-        f'<div class="status-bar">'
-        f'<span>Encryption: {dot(enc_ok)}</span>'
-        f'<span>Signatures: {dot(sig_ok)}</span>'
-        f'<span>Threshold: {dot(thr_ok)}</span>'
-        f'<span>Aggregation: {dot(agg_ok)}</span>'
-        f'<span style="margin-left:auto;">Clients: {nc} | Parties: {np_}/{t}</span>'
-        f'</div>'
-    )
-    st.markdown(status_html, unsafe_allow_html=True)
+    st.markdown(render_bottom_status(nc, np_, t, enc_ok, sig_ok, thr_ok, agg_ok), unsafe_allow_html=True)
 
     # ── Completion Summary ──
     if st.session_state.sim_complete:
@@ -536,10 +504,10 @@ def main():
 
         ch1, ch2 = st.columns(2)
         with ch1:
-            img_buf = make_chart(st.session_state.accuracy_history, "#00b4d8", "o", "Accuracy", "Accuracy vs. Round")
+            img_buf = make_chart(st.session_state.accuracy_history, "#2563eb", "o", "Accuracy", "Accuracy vs. Round")
             st.image(img_buf, use_container_width=True)
         with ch2:
-            img_buf = make_chart(st.session_state.loss_history, "#e63946", "s", "Avg Loss", "Loss vs. Round")
+            img_buf = make_chart(st.session_state.loss_history, "#ef4444", "s", "Avg Loss", "Loss vs. Round")
             st.image(img_buf, use_container_width=True)
 
         st.markdown("#### Participation Summary")

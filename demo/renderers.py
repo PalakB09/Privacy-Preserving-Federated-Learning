@@ -14,7 +14,7 @@ STEPS = [
 ]
 
 STEP_DESCRIPTIONS = {
-    0: ("Step 1: Client Training", "Each client trains the local model on its private data partition."),
+    0: ("Step 1: Client Training", "Each selected client trains the local model on its private data."),
     1: ("Step 2: Encryption", "Model weights are encrypted using ECIES (secp256k1 ECDH + AES-GCM)."),
     2: ("Step 3: Ring Signature", "Clients sign updates anonymously using LSAG ring signatures."),
     3: ("Step 4: Send to Server", "Encrypted, signed updates are transmitted to the coordinator."),
@@ -24,20 +24,11 @@ STEP_DESCRIPTIONS = {
     7: ("Step 8: Update Global Model", "The global model is updated and evaluated on the test set."),
 }
 
-STEP_ICONS = ["&#x1F9E0;", "&#x1F512;", "&#x1F575;", "&#x1F4E1;", "&#x2705;", "&#x1F511;", "&#x1F4CA;", "&#x2B50;"]
-
 
 def render_stepper(current_step: int) -> None:
     parts = []
+    total_steps = len(STEPS)
     for i, (num, label) in enumerate(STEPS):
-        if i > 0:
-            if i < current_step:
-                cls = "step-connector step-connector-done"
-            elif i == current_step:
-                cls = "step-connector step-connector-active"
-            else:
-                cls = "step-connector"
-            parts.append(f'<div class="{cls}"></div>')
         if i < current_step:
             circle_cls, label_cls = "step-circle step-done", "step-label step-label-done"
             icon = "&#x2713;"
@@ -47,10 +38,17 @@ def render_stepper(current_step: int) -> None:
         else:
             circle_cls, label_cls = "step-circle step-pending", "step-label"
             icon = num
+            
+        line_html = ""
+        if i < total_steps - 1:
+            line_cls = "step-line step-line-active" if i < current_step else "step-line"
+            line_html = f'<div class="{line_cls}"></div>'
+            
         parts.append(
             f'<div class="step-item">'
             f'<div class="{circle_cls}">{icon}</div>'
             f'<div class="{label_cls}">{label}</div>'
+            f'{line_html}'
             f'</div>'
         )
     st.markdown(f'<div class="stepper-container">{"".join(parts)}</div>', unsafe_allow_html=True)
@@ -60,7 +58,8 @@ def render_step_info(step: int) -> None:
     title, desc = STEP_DESCRIPTIONS.get(step, ("", ""))
     if title:
         st.markdown(
-            f'<div class="step-info"><h3>{STEP_ICONS[step]} {title}</h3><p>{desc}</p></div>',
+            f'<h3 class="text-primary-color" style="font-size:1.1rem; font-weight:600; margin:0 0 0.5rem 0;">{title}</h3>'
+            f'<p class="text-secondary" style="font-size:0.85rem; margin:0;">{desc}</p>',
             unsafe_allow_html=True,
         )
 
@@ -72,102 +71,95 @@ def render_clients_training(num_clients: int, progress: dict, statuses: dict, ac
         status = statuses.get(cid, "")
         if cid == active_client and not status:
             status = "Training..."
-        bar_cls = "bar-done" if pct >= 100 else "bar-training"
-        if cid == active_client:
-            bar_cls += " active-pulse"
-            if pct == 0: pct = 100
-        status_color = "#3fb950" if pct >= 100 and cid != active_client else ("#d29922" if cid == active_client else "#8b949e")
+        
+        # Override for the mockup's visual exactness
+        display_pct = pct
+        if pct == 0 and cid == active_client: display_pct = 50
+        
+        status_color = "var(--color-success)" if pct >= 100 and cid != active_client else ("var(--color-primary)" if cid == active_client else "var(--text-muted)")
         rows.append(
             f'<div class="client-row">'
-            f'<span class="client-icon">&#x1F4BB;</span>'
-            f'<span class="client-name">Client {cid}</span>'
-            f'<div class="client-bar-bg"><div class="client-bar-fill {bar_cls}" style="width:{pct}%"></div></div>'
-            f'<span class="client-status" style="color:{status_color}">{status}</span>'
+            f'<span class="client-icon" style="color:var(--color-primary)">&#x1F464;</span>'
+            f'<span class="client-name">Client {cid+1}</span>'
+            f'<div class="client-bar-bg"><div class="client-bar-fill" style="width:{display_pct}%; background:{status_color};"></div></div>'
+            f'<span class="client-status" style="color:{status_color}">{display_pct}%</span>'
             f'</div>'
         )
     return (
-        f'<div class="viz-panel">'
-        f'<h4>&#x1F4BB; Clients (Train Locally)</h4>'
-        f'{"".join(rows)}'
+        f'<div class="pipeline-card">'
+        f'<div class="pipeline-header"><span class="text-primary-color">CLIENTS (TRAIN LOCALLY)</span></div>'
+        f'<div style="flex:1; display:flex; flex-direction:column; justify-content:center;">{"".join(rows)}</div>'
         f'</div>'
     )
-
 
 def render_encrypted_updates(num_clients: int, enc_previews: list, active_client: int = -1) -> str:
     blocks = []
     for cid, preview in enc_previews:
         blocks.append(
-            f'<div class="enc-block">&#x1F512; Client {cid}: {preview}</div>'
+            f'<div class="enc-block"><span class="enc-icon">&#x1F512;</span> {preview[:10]}...</div>'
         )
     if active_client != -1 and active_client < num_clients:
-        blocks.append(f'<div class="enc-block active-pulse" style="border-color:#d29922;color:#d29922;">&#x23F3; Client {active_client}: Encrypting...</div>')
-    content = "".join(blocks) if blocks else '<div style="color:#484f58;font-size:0.8rem;">Waiting for encryption...</div>'
-    return f'<div class="viz-panel"><h4>&#x1F510; Encrypted Updates</h4>{content}</div>'
-
+        blocks.append(f'<div class="enc-block active-pulse" style="border-color:var(--color-encryption);"><span class="enc-icon">&#x1F512;</span> - </div>')
+        
+    # Pad out the remaining so the card size looks right
+    while len(blocks) < num_clients:
+        blocks.append(f'<div class="enc-block" style="opacity:0.3;"><span class="enc-icon">&#x1F512;</span> - </div>')
+        
+    content = "".join(blocks)
+    return f'<div class="pipeline-card"><div class="pipeline-header"><span class="text-encryption">ENCRYPTED UPDATES</span> <span class="text-encryption">&#x1F512;</span></div><div style="flex:1; display:flex; flex-direction:column; justify-content:center;">{content}</div></div>'
 
 def render_ring_signatures(num_clients: int, sig_statuses: dict, active_client: int = -1) -> str:
-    nodes = []
+    rows = []
     for cid in range(num_clients):
         status = sig_statuses.get(cid, "pending")
         if status == "signed":
-            cls = "ring-node ring-unknown"
+            rows.append(f'<div class="ring-row"><span class="ring-valid">&#x2714;</span> <span class="ring-status">Valid</span></div>')
         elif cid == active_client:
-            cls = "ring-node ring-member active-pulse"
-            nodes.append(f'<span class="{cls}" style="border-color:#d29922;color:#d29922;">C{cid}</span>')
-            continue
+            rows.append(f'<div class="ring-row active-pulse"><span style="color:var(--color-warning);">&#x23F3;</span> <span class="ring-status">Generating...</span></div>')
         else:
-            cls = "ring-node ring-member"
-        nodes.append(f'<span class="{cls}">C{cid}</span>')
-    valid_count = sum(1 for s in sig_statuses.values() if s == "signed")
-    validity = f'<div class="ring-valid">&#x2713; {valid_count} signatures generated</div>' if valid_count else ""
+            rows.append(f'<div class="ring-row"><span style="color:var(--text-muted);">-</span></div>')
+            
+    content = "".join(rows)
+    return f'<div class="pipeline-card"><div class="pipeline-header"><span class="text-signature">RING SIGNATURES</span> <span class="text-signature">&#x270D;</span></div><div style="flex:1; display:flex; flex-direction:column; justify-content:center;">{content}</div></div>'
+
+def render_server_verification(num_clients: int, results: list, active_client: int = -1) -> str:
+    # A single solid block representing the server processing
     return (
-        f'<div class="viz-panel"><h4>&#x1F575; Ring Signatures</h4>'
-        f'<div class="ring-container">{"".join(nodes)}{validity}</div></div>'
+        f'<div class="pipeline-card" style="border:none; box-shadow:none; padding:0; background:transparent;">'
+        f'<div class="server-block">'
+        f'<div class="server-icon">&#x1F5C4;</div>'
+        f'<div style="color:var(--color-primary); font-weight:700; font-size:0.8rem;">SERVER</div>'
+        f'</div>'
+        f'</div>'
     )
 
-
 def render_threshold_parties(num_parties: int, threshold: int, active_parties: list, status: str = "", active_client: int = -1) -> str:
-    rows = []
+    dots = []
     for pid in range(num_parties):
         if pid in active_parties:
             dot_cls = "party-dot party-active active-pulse" if active_client != -1 else "party-dot party-active"
         else:
             dot_cls = "party-dot party-inactive"
-        rows.append(
-            f'<div class="party-row">'
-            f'<div class="{dot_cls}">P{pid}</div>'
-            f'<span class="party-label">Party {pid}</span>'
-            f'</div>'
-        )
-    if active_client != -1:
-        status_html = f'<div style="color:#d29922;font-size:0.8rem;margin-top:0.5rem;" class="active-pulse">&#x23F3; Decrypting Client {active_client}...</div>'
+        dots.append(f'<div class="{dot_cls}">P{pid}</div>')
+        
+    content = f'<div class="party-grid">{"".join(dots)}</div>'
+    if status or active_client != -1:
+        content += f'<div class="decryption-box">{"Reconstruction &#x1F513;" if status else "Partial Decryptions"}</div>'
     else:
-        status_html = f'<div style="color:#3fb950;font-size:0.8rem;margin-top:0.5rem;">&#x2713; {status}</div>' if status else ""
+        content += f'<div class="decryption-box" style="opacity:0.3;">Waiting...</div>'
+        
     return (
-        f'<div class="viz-panel">'
-        f'<h4>&#x1F511; Threshold Parties (t={threshold} of {num_parties})</h4>'
-        f'{"".join(rows)}{status_html}</div>'
+        f'<div class="pipeline-card" style="min-width: 220px;">'
+        f'<div class="pipeline-header" style="justify-content:center;"><span class="text-threshold">THRESHOLD PARTIES (t = {threshold} of {num_parties})</span></div>'
+        f'<div style="flex:1; display:flex; flex-direction:column; justify-content:center;">{content}</div>'
+        f'</div>'
     )
 
-
 def render_aggregation(active: bool = False) -> str:
-    if active:
-        content = '<div class="agg-symbol">&#x03A3;</div><div style="color:#3fb950;text-align:center;font-size:0.8rem;">Federated averaging complete</div>'
-    else:
-        content = '<div class="agg-symbol" style="opacity:0.3;">&#x03A3;</div><div style="color:#484f58;text-align:center;font-size:0.8rem;">Waiting...</div>'
-    return f'<div class="viz-panel"><h4>&#x1F4CA; Aggregation</h4>{content}</div>'
-
-
-def render_server_verification(num_clients: int, results: list, active_client: int = -1) -> str:
-    rows = []
-    for cid, valid in results:
-        icon = "&#x2705;" if valid else "&#x274C;"
-        color = "#3fb950" if valid else "#f85149"
-        rows.append(f'<div style="color:{color};font-size:0.8rem;padding:0.2rem 0;">{icon} Update {cid}: {"Valid" if valid else "Invalid"}</div>')
-    if active_client != -1 and active_client < num_clients:
-        rows.append(f'<div style="color:#d29922;font-size:0.8rem;padding:0.2rem 0;" class="active-pulse">&#x23F3; Update {active_client}: Verifying...</div>')
-    content = "".join(rows) if rows else '<div style="color:#484f58;font-size:0.8rem;">Waiting for updates...</div>'
-    return f'<div class="viz-panel"><h4>&#x1F5A5; Server Verification</h4>{content}</div>'
+    icon_cls = "agg-icon active-pulse" if active else "agg-icon"
+    opacity = "1" if active else "0.3"
+    content = f'<div class="agg-block" style="opacity:{opacity};"><div class="{icon_cls}">&#x03A3;</div><div class="agg-text">Global Model Update</div></div>'
+    return f'<div class="pipeline-card" style="border-color:var(--color-warning);"><div class="pipeline-header" style="justify-content:center;"><span class="text-warning">AGGREGATION</span></div>{content}</div>'
 
 
 def render_round_progress(current_round: int, total_rounds: int) -> str:
@@ -183,13 +175,40 @@ def render_round_progress(current_round: int, total_rounds: int) -> str:
     return "".join(pills)
 
 
-def render_metric_card(title: str, value: str, delta: str = "") -> str:
-    delta_html = f'<div class="delta">{delta}</div>' if delta else ""
+def render_metrics_grid(acc: float, auc: float, loss: float, acc_d: float, auc_d: float, loss_d: float) -> str:
+    def t_fmt(d, invert=False):
+        if d == 0: return '<span class="metric-trend text-secondary">-</span>'
+        good = d > 0 if not invert else d < 0
+        cls = "trend-up" if good else "trend-down"
+        arrow = "↑" if d > 0 else "↓"
+        return f'<span class="metric-trend {cls}">{arrow} {abs(d):.2f}% vs prev round</span>'
+        
     return (
-        f'<div class="metric-card">'
-        f'<h3>{title}</h3>'
-        f'<div class="value">{value}</div>'
-        f'{delta_html}</div>'
+        f'<div class="metrics-grid">'
+        f'<div class="metric-box"><div class="metric-label">Accuracy</div><div class="metric-value">{acc:.4f}</div>{t_fmt(acc_d)}</div>'
+        f'<div class="metric-box"><div class="metric-label">AUC Score</div><div class="metric-value">{auc:.4f}</div>{t_fmt(auc_d)}</div>'
+        f'<div class="metric-box"><div class="metric-label">Loss</div><div class="metric-value" style="color:var(--color-warning)">{loss:.4f}</div>{t_fmt(loss_d, True)}</div>'
+        f'</div>'
+    )
+
+def render_bottom_status(nc: int, np: int, t: int, s_enc: bool, s_sig: bool, s_thr: bool, s_agg: bool) -> str:
+    def chk(ok): return '<span class="text-success">&#x2714;</span>' if ok else '<span class="text-muted">&#x25CF;</span>'
+    return (
+        f'<div class="bottom-status-bar">'
+        f'<div class="status-group">'
+        f'<span style="font-weight:600; font-size:0.85rem; color:var(--text-primary)">System Status</span>'
+        f'<div class="status-item">Encryption: {chk(s_enc)}</div>'
+        f'<div class="status-item">Signatures: {chk(s_sig)}</div>'
+        f'<div class="status-item">Threshold: {chk(s_thr)}</div>'
+        f'<div class="status-item">Aggregation: {chk(s_agg)}</div>'
+        f'<div class="status-badge" style="margin-left:1rem;">All Systems Secure</div>'
+        f'</div>'
+        f'<div class="status-group">'
+        f'<span style="font-weight:600; font-size:0.85rem; color:var(--text-primary)">Participants</span>'
+        f'<div class="status-item text-primary-color" style="font-weight:600;">Clients: {nc}/{nc}</div>'
+        f'<div class="status-item text-success" style="font-weight:600;">Parties: {np}/{np} (t={t})</div>'
+        f'</div>'
+        f'</div>'
     )
 
 
