@@ -5,15 +5,15 @@ MAIN_CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-    --bg-main: #f8fafc;
-    --bg-card: #ffffff;
-    --border-color: #e5e7eb;
+    --bg-main: var(--background-color, #f8fafc);
+    --bg-card: var(--secondary-background-color, #ffffff);
+    --border-color: color-mix(in srgb, var(--text-color) 15%, transparent);
     
-    --text-primary: #0f172a;
-    --text-secondary: #64748b;
-    --text-muted: #94a3b8;
+    --text-primary: var(--text-color, #0f172a);
+    --text-secondary: color-mix(in srgb, var(--text-color) 70%, transparent);
+    --text-muted: color-mix(in srgb, var(--text-color) 40%, transparent);
     
-    --color-primary: #2563eb;
+    --color-primary: var(--primary-color, #2563eb);
     --color-success: #22c55e;
     --color-warning: #f59e0b;
     --color-danger: #ef4444;
@@ -140,27 +140,27 @@ header[data-testid="stHeader"] { display: none; }
     display: flex; align-items: center; gap: 8px; padding: 0.3rem 0;
 }
 .client-name { font-size: 0.75rem; color: var(--text-primary); font-weight: 500; min-width: 55px; display: flex; align-items: center; gap: 4px; }
-.client-bar-bg { flex: 1; height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+.client-bar-bg { flex: 1; height: 6px; background: var(--border-color); border-radius: 3px; overflow: hidden; }
 .client-bar-fill { height: 100%; background: var(--color-success); border-radius: 3px; transition: width 0.3s ease; }
 .client-status { font-size: 0.7rem; color: var(--text-secondary); min-width: 35px; text-align: right; }
 
 /* Encrypted Block */
 .enc-block {
-    background: #f8fafc; border: 1px solid var(--border-color); border-radius: 6px;
+    background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 6px;
     padding: 0.4rem 0.6rem; font-family: monospace; font-size: 0.7rem; color: var(--text-secondary);
     margin-bottom: 0.4rem; display: flex; align-items: center; gap: 6px;
 }
 .enc-icon { color: var(--color-encryption); }
 
 /* Ring Signatures */
-.ring-row { display: flex; align-items: center; gap: 8px; padding: 0.4rem 0; border-bottom: 1px solid #f1f5f9; }
+.ring-row { display: flex; align-items: center; gap: 8px; padding: 0.4rem 0; border-bottom: 1px solid var(--border-color); }
 .ring-row:last-child { border-bottom: none; }
 .ring-status { font-size: 0.75rem; font-weight: 500; }
 .ring-valid { color: var(--color-success); }
 
 /* Server Block */
 .server-block {
-    background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px;
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent); border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent); border-radius: 12px;
     display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;
 }
 .server-icon { background: var(--color-primary); color: white; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 700; letter-spacing: 1px; margin-bottom: 0.5rem; }
@@ -171,8 +171,8 @@ header[data-testid="stHeader"] { display: none; }
     width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     font-size: 0.7rem; font-weight: 600; flex-direction: column;
 }
-.party-active { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
-.party-inactive { background: #f1f5f9; color: var(--text-muted); border: 1px solid var(--border-color); }
+.party-active { background: color-mix(in srgb, var(--color-success) 15%, transparent); color: var(--color-success); border: 1px solid color-mix(in srgb, var(--color-success) 40%, transparent); }
+.party-inactive { background: var(--border-color); color: var(--text-muted); border: 1px solid transparent; }
 .decryption-box {
     border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem;
     text-align: center; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;
@@ -194,7 +194,7 @@ header[data-testid="stHeader"] { display: none; }
 }
 .status-group { display: flex; align-items: center; gap: 1.5rem; }
 .status-item { font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.3rem; }
-.status-badge { background: #eff6ff; color: var(--color-primary); border: 1px solid #bfdbfe; padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: 600; font-size: 0.75rem; }
+.status-badge { background: color-mix(in srgb, var(--color-primary) 10%, transparent); color: var(--color-primary); border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent); padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: 600; font-size: 0.75rem; }
 /* Active Pulse Animation */
 .active-pulse {
     animation: clientPulse 1.5s infinite;
@@ -222,8 +222,8 @@ header[data-testid="stHeader"] { display: none; }
     padding-bottom: 0.6rem;
 }
 .math-focus-badge {
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
     color: var(--color-primary); padding: 0.1rem 0.6rem;
     border-radius: 20px; font-size: 0.75rem;
     font-weight: 600;
