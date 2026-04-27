@@ -15,7 +15,17 @@ Federated learning enables collaborative model training without sharing raw data
 This project addresses all three threats simultaneously through a multi-layered cryptographic architecture.
 
 ---
+## Video Walkthrough
 
+
+https://github.com/user-attachments/assets/fd9f70b0-9353-4d5d-88ca-1062f656fa14
+
+
+
+
+
+
+---
 ## System Architecture
 
 ```mermaid
