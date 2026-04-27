@@ -28,6 +28,7 @@ from demo.renderers import (
     render_encrypted_updates, render_ring_signatures, render_threshold_parties,
     render_aggregation, render_server_verification, render_round_progress,
     render_metrics_grid, render_bottom_status, render_math_panel, STEPS,
+    render_metric_card,
 )
 
 st.set_page_config(page_title="Threshold-FL Demo", page_icon="", layout="wide", initial_sidebar_state="expanded")

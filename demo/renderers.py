@@ -191,6 +191,16 @@ def render_metrics_grid(acc: float, auc: float, loss: float, acc_d: float, auc_d
         f'</div>'
     )
 
+def render_metric_card(title: str, value: str, delta: str = "") -> str:
+    delta_html = f'<div class="metric-trend">{delta}</div>' if delta else ""
+    return (
+        f'<div class="metric-box" style="margin-bottom:1rem;">'
+        f'<div class="metric-label">{title}</div>'
+        f'<div class="metric-value">{value}</div>'
+        f'{delta_html}'
+        f'</div>'
+    )
+
 def render_bottom_status(nc: int, np: int, t: int, s_enc: bool, s_sig: bool, s_thr: bool, s_agg: bool) -> str:
     def chk(ok): return '<span class="text-success">&#x2714;</span>' if ok else '<span class="text-muted">&#x25CF;</span>'
     return (
