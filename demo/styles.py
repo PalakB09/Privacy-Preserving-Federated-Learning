@@ -27,9 +27,9 @@ MAIN_CSS = """
 /* Global Reset & Typography */
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: var(--bg-main); color: var(--text-primary); }
 
-/* Hide default streamlit header/padding to allow custom header */
+/* Hide default streamlit header background to allow custom header but keep buttons */
 .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; max-width: 95% !important; }
-header[data-testid="stHeader"] { display: none; }
+header[data-testid="stHeader"] { background-color: transparent !important; }
 
 /* Utilities */
 .text-primary-color { color: var(--color-primary) !important; }
